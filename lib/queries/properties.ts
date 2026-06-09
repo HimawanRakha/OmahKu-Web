@@ -7,6 +7,19 @@ import type { RowDataPacket } from "mysql2";
 import { query, queryOne } from "@/lib/db";
 import type { PropertyCardData, PropertyFilters, PropertySortOption, PropertyWithDetails } from "@/types";
 
+function castPropertyCard(row: RowDataPacket): PropertyCardData {
+  return {
+    ...row,
+    price: Number(row.price),
+    avg_rating: row.avg_rating != null ? Number(row.avg_rating) : null,
+    review_count: Number(row.review_count),
+    building_area: row.building_area != null ? Number(row.building_area) : null,
+    land_area: row.land_area != null ? Number(row.land_area) : null,
+    agent_verified: Boolean(row.agent_verified),
+    is_wishlisted: Boolean(row.is_wishlisted),
+  } as unknown as PropertyCardData; // ← tambah 'unknown' di tengah
+}
+
 // FIX: hapus u.profile_photo_url — kolom ini tidak ada di schema user
 const PROPERTY_CARD_SELECT = `
   p.id, p.title, p.price, p.listing_type, p.rent_period, p.status,
@@ -133,24 +146,48 @@ function sortClause(sort: PropertySortOption): string {
 }
 
 export async function getFeaturedProperties(userId?: number): Promise<PropertyCardData[]> {
-  const wishlistJoin = userId ? `, EXISTS(SELECT 1 FROM wishlist w WHERE w.property_id = p.id AND w.user_id = ? AND w.deleted_at IS NULL) AS is_wishlisted` : "";
-  const params = userId ? [userId] : [];
+  let wishlistSelect = "";
+  const wishlistParams: number[] = [];
+
+  if (userId) {
+    wishlistSelect = `, EXISTS(
+      SELECT 1 FROM wishlist w 
+      WHERE w.property_id = p.id 
+      AND w.user_id = ? 
+      AND w.deleted_at IS NULL
+    ) AS is_wishlisted`;
+    wishlistParams.push(userId);
+  }
 
   const rows = await query<RowDataPacket[]>(
-    `SELECT ${PROPERTY_CARD_SELECT}${wishlistJoin}
+    `SELECT ${PROPERTY_CARD_SELECT}${wishlistSelect}
      ${PROPERTY_CARD_JOINS}
      WHERE p.deleted_at IS NULL AND p.status IN ('available', 'booked')
      GROUP BY p.id
      ORDER BY p.created_at DESC
      LIMIT 6`,
-    params,
+    wishlistParams, // FIX: hanya wishlistParams, tidak ada params lain
   );
-  return rows as unknown as PropertyCardData[];
+
+  return rows.map(castPropertyCard);
 }
 
 export async function getProperties(filters: PropertyFilters = {}, sort: PropertySortOption = "newest", showAllStatus = false, userId?: number, minRating?: number): Promise<PropertyCardData[]> {
   const { clause, params } = buildWhereClause(filters, showAllStatus);
-  const wishlistJoin = userId ? `, EXISTS(SELECT 1 FROM wishlist w WHERE w.property_id = p.id AND w.user_id = ? AND w.deleted_at IS NULL) AS is_wishlisted` : "";
+
+  // FIX: pisahkan wishlist select dan params dengan jelas
+  let wishlistSelect = "";
+  const wishlistParams: number[] = [];
+
+  if (userId) {
+    wishlistSelect = `, EXISTS(
+      SELECT 1 FROM wishlist w 
+      WHERE w.property_id = p.id 
+      AND w.user_id = ? 
+      AND w.deleted_at IS NULL
+    ) AS is_wishlisted`;
+    wishlistParams.push(userId);
+  }
 
   let having = "";
   const havingParams: number[] = [];
@@ -159,10 +196,12 @@ export async function getProperties(filters: PropertyFilters = {}, sort: Propert
     havingParams.push(minRating);
   }
 
-  const allParams = userId ? [...params, userId, ...havingParams] : [...params, ...havingParams];
+  // FIX: urutan params harus sama persis dengan urutan ? di query
+  // SELECT params (wishlist) → WHERE params (filter) → HAVING params
+  const allParams = [...wishlistParams, ...params, ...havingParams];
 
   const rows = await query<RowDataPacket[]>(
-    `SELECT ${PROPERTY_CARD_SELECT}${wishlistJoin}
+    `SELECT ${PROPERTY_CARD_SELECT}${wishlistSelect}
      ${PROPERTY_CARD_JOINS}
      WHERE ${clause}
      GROUP BY p.id
@@ -170,7 +209,8 @@ export async function getProperties(filters: PropertyFilters = {}, sort: Propert
      ORDER BY ${sortClause(sort)}`,
     allParams,
   );
-  return rows as unknown as PropertyCardData[];
+
+  return rows.map(castPropertyCard);
 }
 
 export async function getPropertyById(id: number): Promise<PropertyWithDetails | null> {

@@ -125,15 +125,12 @@ const BOOKING_STATUS_CONFIG: Record<BookingStatus, StatusBadgeConfig> = {
   expired: { label: "Kedaluwarsa", variant: "neutral" },
 };
 
-const TRANSACTION_STATUS_CONFIG: Record<TransactionStatus, StatusBadgeConfig> =
-  {
-    pending: { label: "Menunggu", variant: "warning" },
-    confirmed: { label: "Dikonfirmasi", variant: "info" },
-    cancelled: { label: "Dibatalkan", variant: "danger" },
-    expired: { label: "Kedaluwarsa", variant: "neutral" },
-    success: { label: "Selesai", variant: "success" },
-    failed: { label: "Gagal", variant: "danger" },
-  };
+const TRANSACTION_STATUS_CONFIG: Record<TransactionStatus, StatusBadgeConfig> = {
+  pending: { label: "Menunggu", variant: "warning" },
+  cancelled: { label: "Dibatalkan", variant: "danger" },
+  success: { label: "Selesai", variant: "success" },
+  failed: { label: "Gagal", variant: "danger" },
+};
 
 export function getPropertyStatusBadge(
   status: PropertyStatus,

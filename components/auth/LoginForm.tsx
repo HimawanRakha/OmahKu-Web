@@ -16,8 +16,9 @@ export function LoginForm() {
     e.preventDefault();
     setLoading(true);
     const form = new FormData(e.currentTarget);
+    const identifier = form.get("identifier") as string;
     const result = await signIn("credentials", {
-      identifier: form.get("identifier") as string,
+      identifier,
       password: form.get("password") as string,
       redirect: false,
     });
@@ -29,7 +30,19 @@ export function LoginForm() {
     }
 
     toast("success", "Berhasil masuk!");
-    router.push(searchParams.get("callbackUrl") ?? "/dashboard");
+
+    const callback = searchParams.get("callbackUrl");
+    if (callback) {
+      router.push(callback);
+    } else {
+      const roleRes = await fetch("/api/auth/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier }),
+      });
+      const { role } = await roleRes.json();
+      router.push(role === "agent" || role === "admin" ? "/agent/dashboard" : "/dashboard");
+    }
     router.refresh();
   }
 

@@ -51,6 +51,18 @@ export async function getUserTransactions(userId: number, status?: string): Prom
   return rows as unknown as TransactionWithDetails[];
 }
 
+function castPropertyCard(row: RowDataPacket) {
+  return {
+    ...row,
+    price: Number(row.price),
+    avg_rating: row.avg_rating != null ? Number(row.avg_rating) : null,
+    review_count: Number(row.review_count),
+    building_area: row.building_area != null ? Number(row.building_area) : null,
+    agent_verified: Boolean(row.agent_verified),
+    is_wishlisted: true,
+  };
+}
+
 export async function getUserWishlist(userId: number): Promise<PropertyCardData[]> {
   const rows = await query<RowDataPacket[]>(
     `SELECT p.id, p.title, p.price, p.listing_type, p.rent_period, p.status,
@@ -74,7 +86,7 @@ export async function getUserWishlist(userId: number): Promise<PropertyCardData[
      ORDER BY w.created_at DESC`,
     [userId],
   );
-  return rows as unknown as PropertyCardData[];
+  return rows.map(castPropertyCard) as unknown as PropertyCardData[];
 }
 
 export async function getUserReviews(userId: number) {
