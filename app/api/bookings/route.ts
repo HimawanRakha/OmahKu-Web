@@ -8,25 +8,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { property_id, notes } = await request.json();
-  const userId = Number(session.user.id);
+  const { property_id, notes, requested_start_date, requested_end_date } = await request.json();
+  const customerId = Number(session.user.id);
   const pool = getPool();
 
-  const [properties] = await pool.execute(
-    `SELECT status FROM property WHERE id = ? AND deleted_at IS NULL`,
-    [property_id],
-  );
-  const prop = (properties as { status: string }[])[0];
+  const [properties] = await pool.execute(`SELECT status, listing_type FROM property WHERE id = ? AND deleted_at IS NULL`, [property_id]);
+  const prop = (properties as { status: string; listing_type: string }[])[0];
   if (!prop || prop.status !== "available") {
-    return NextResponse.json(
-      { error: "Properti tidak tersedia untuk booking." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Properti tidak tersedia untuk booking." }, { status: 400 });
   }
 
+  // FIX: pakai customer_id (bukan user_id) sesuai schema booking
+  // FIX: tambah requested_start_date dan requested_end_date untuk properti sewa
   await pool.execute(
-    `INSERT INTO booking (property_id, user_id, status, notes) VALUES (?, ?, 'pending', ?)`,
-    [property_id, userId, notes ?? null],
+    `INSERT INTO booking (property_id, customer_id, requested_start_date, requested_end_date, status, notes)
+     VALUES (?, ?, ?, ?, 'pending', ?)`,
+    [property_id, customerId, requested_start_date ?? null, requested_end_date ?? null, notes ?? null],
   );
 
   return NextResponse.json({ success: true });
@@ -39,12 +36,13 @@ export async function PATCH(request: Request) {
   }
 
   const { booking_id, status } = await request.json();
-  const pool = getPool();
+  const validStatuses = ["pending", "confirmed", "cancelled", "expired"];
+  if (!validStatuses.includes(status)) {
+    return NextResponse.json({ error: "Status tidak valid." }, { status: 400 });
+  }
 
-  await pool.execute(`UPDATE booking SET status = ? WHERE id = ?`, [
-    status,
-    booking_id,
-  ]);
+  const pool = getPool();
+  await pool.execute(`UPDATE booking SET status = ? WHERE id = ?`, [status, booking_id]);
 
   return NextResponse.json({ success: true });
 }

@@ -1,11 +1,12 @@
+// ============================================================
+// lib/queries/agents.ts — FIXED
+// Perbaikan: hapus profile_photo_url (tidak ada di schema user)
+// ============================================================
 import type { RowDataPacket } from "mysql2";
 import { query, queryOne } from "@/lib/db";
 import type { AgentCardData, AgentProfileWithStats } from "@/types";
 
-export async function getAgents(
-  city?: string,
-  minRating?: number,
-): Promise<AgentCardData[]> {
+export async function getAgents(city?: string, minRating?: number): Promise<AgentCardData[]> {
   let having = "";
   const params: string[] = [];
   const conditions = ["u.role = 'agent'", "u.deleted_at IS NULL", "ap.id IS NOT NULL"];
@@ -20,15 +21,17 @@ export async function getAgents(
     params.push(String(minRating));
   }
 
+  // FIX: hapus u.profile_photo_url, ganti NULL AS agent_photo_url
   const rows = await query<RowDataPacket[]>(
-    `SELECT u.id, u.full_name, u.profile_photo_url,
+    `SELECT u.id, u.full_name,
+      NULL AS agent_photo_url,
       ap.agency_name, ap.license_number, ap.verified_at,
       COUNT(DISTINCT CASE WHEN p.status IN ('available','booked') AND p.deleted_at IS NULL THEN p.id END) AS active_property_count,
       COALESCE(AVG(r.rating), 0) AS avg_rating
-     FROM user u
+     FROM \`user\` u
      JOIN agent_profile ap ON ap.user_id = u.id
      LEFT JOIN property p ON p.agent_id = u.id
-     LEFT JOIN review r ON r.property_id = p.id
+     LEFT JOIN review r ON r.property_id = p.id AND r.deleted_at IS NULL
      WHERE ${conditions.join(" AND ")}
      GROUP BY u.id
      ${having}
@@ -39,22 +42,21 @@ export async function getAgents(
   return rows as unknown as AgentCardData[];
 }
 
-export async function getAgentProfile(
-  id: number,
-  viewerId?: number,
-  viewerRole?: string,
-): Promise<AgentProfileWithStats | null> {
+export async function getAgentProfile(id: number, viewerId?: number, viewerRole?: string): Promise<AgentProfileWithStats | null> {
+  // FIX: hapus u.profile_photo_url, ganti NULL AS agent_photo_url
   const row = await queryOne<RowDataPacket>(
-    `SELECT u.id, u.full_name, u.profile_photo_url, u.created_at,
+    `SELECT u.id, u.full_name,
+      NULL AS agent_photo_url,
+      u.created_at,
       ap.agency_name, ap.license_number, ap.bio, ap.verified_at,
       COUNT(DISTINCT CASE WHEN t.status = 'success' THEN t.id END) AS total_transactions,
       COUNT(DISTINCT CASE WHEN p.status IN ('available','booked') AND p.deleted_at IS NULL THEN p.id END) AS active_property_count,
       COALESCE(AVG(r.rating), 0) AS avg_rating
-     FROM user u
+     FROM \`user\` u
      JOIN agent_profile ap ON ap.user_id = u.id
      LEFT JOIN property p ON p.agent_id = u.id
-     LEFT JOIN transaction t ON t.agent_id = u.id
-     LEFT JOIN review r ON r.property_id = p.id
+     LEFT JOIN \`transaction\` t ON t.agent_id = u.id AND t.deleted_at IS NULL
+     LEFT JOIN review r ON r.property_id = p.id AND r.deleted_at IS NULL
      WHERE u.id = ? AND u.role = 'agent' AND u.deleted_at IS NULL
      GROUP BY u.id`,
     [id],
@@ -62,14 +64,12 @@ export async function getAgentProfile(
 
   if (!row) return null;
 
-  const canSeeRevenue =
-    viewerRole === "admin" || viewerId === id;
-
+  const canSeeRevenue = viewerRole === "admin" || viewerId === id;
   let total_revenue: number | null = null;
   if (canSeeRevenue) {
     const rev = await queryOne<RowDataPacket>(
       `SELECT COALESCE(SUM(agreed_amount), 0) AS total_revenue
-       FROM transaction WHERE agent_id = ? AND status = 'success'`,
+       FROM \`transaction\` WHERE agent_id = ? AND status = 'success' AND deleted_at IS NULL`,
       [id],
     );
     total_revenue = Number(rev?.total_revenue ?? 0);
@@ -92,13 +92,14 @@ export async function getAgentProperties(agentId: number) {
       COALESCE(AVG(r.rating), 0) AS avg_rating,
       COUNT(DISTINCT r.id) AS review_count,
       (SELECT pi.image_url FROM property_image pi WHERE pi.property_id = p.id AND pi.is_primary = TRUE LIMIT 1) AS primary_image_url,
-      u.full_name AS agent_name, u.profile_photo_url AS agent_photo_url,
+      u.full_name AS agent_name,
+      NULL AS agent_photo_url,
       (ap.verified_at IS NOT NULL) AS agent_verified
      FROM property p
      JOIN location l ON p.location_id = l.id
-     JOIN user u ON p.agent_id = u.id
+     JOIN \`user\` u ON p.agent_id = u.id
      LEFT JOIN agent_profile ap ON ap.user_id = u.id
-     LEFT JOIN review r ON r.property_id = p.id
+     LEFT JOIN review r ON r.property_id = p.id AND r.deleted_at IS NULL
      WHERE p.agent_id = ? AND p.deleted_at IS NULL
      GROUP BY p.id ORDER BY p.created_at DESC`,
     [agentId],

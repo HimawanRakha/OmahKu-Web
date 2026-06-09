@@ -1,3 +1,7 @@
+// ============================================================
+// lib/queries/dashboard.ts — FIXED
+// Perbaikan: customer_id (bukan user_id), reviewer_id (bukan user_id)
+// ============================================================
 import type { RowDataPacket } from "mysql2";
 import { query, queryOne } from "@/lib/db";
 import type { PropertyCardData, TransactionWithDetails } from "@/types";
@@ -6,8 +10,10 @@ export async function getUserDashboardSummary(userId: number) {
   const row = await queryOne<RowDataPacket>(
     `SELECT
       (SELECT COUNT(*) FROM wishlist WHERE user_id = ? AND deleted_at IS NULL) AS wishlist_count,
-      (SELECT COUNT(*) FROM transaction WHERE user_id = ? AND status = 'pending') AS active_transactions,
-      (SELECT COUNT(*) FROM review WHERE user_id = ?) AS review_count`,
+      -- FIX: transaction.customer_id bukan user_id
+      (SELECT COUNT(*) FROM \`transaction\` WHERE customer_id = ? AND status = 'pending') AS active_transactions,
+      -- FIX: review.reviewer_id bukan user_id
+      (SELECT COUNT(*) FROM review WHERE reviewer_id = ?) AS review_count`,
     [userId, userId, userId],
   );
   return {
@@ -17,10 +23,7 @@ export async function getUserDashboardSummary(userId: number) {
   };
 }
 
-export async function getUserTransactions(
-  userId: number,
-  status?: string,
-): Promise<TransactionWithDetails[]> {
+export async function getUserTransactions(userId: number, status?: string): Promise<TransactionWithDetails[]> {
   let statusClause = "";
   const params: (number | string)[] = [userId];
   if (status) {
@@ -35,11 +38,12 @@ export async function getUserTransactions(
       rt.start_date AS rent_start_date, rt.end_date AS rent_end_date,
       rt.price_per_period AS rent_price_per_period, rt.additional_fee AS rent_additional_fee,
       st.transfer_date AS sale_transfer_date, st.certificate_number AS sale_certificate_number
-     FROM transaction t
+     FROM \`transaction\` t
      JOIN property p ON t.property_id = p.id
      LEFT JOIN rent_transaction rt ON rt.transaction_id = t.id
      LEFT JOIN sale_transaction st ON st.transaction_id = t.id
-     WHERE t.user_id = ? ${statusClause}
+     -- FIX: t.customer_id bukan t.user_id
+     WHERE t.customer_id = ? ${statusClause}
      ORDER BY t.created_at DESC`,
     params,
   );
@@ -55,13 +59,14 @@ export async function getUserWishlist(userId: number): Promise<PropertyCardData[
       COALESCE(AVG(r.rating), 0) AS avg_rating,
       COUNT(DISTINCT r.id) AS review_count,
       (SELECT pi.image_url FROM property_image pi WHERE pi.property_id = p.id AND pi.is_primary = TRUE LIMIT 1) AS primary_image_url,
-      u.full_name AS agent_name, u.profile_photo_url AS agent_photo_url,
+      u.full_name AS agent_name,
+      NULL AS agent_photo_url,
       (ap.verified_at IS NOT NULL) AS agent_verified,
       TRUE AS is_wishlisted
      FROM wishlist w
      JOIN property p ON w.property_id = p.id
      JOIN location l ON p.location_id = l.id
-     JOIN user u ON p.agent_id = u.id
+     JOIN \`user\` u ON p.agent_id = u.id
      LEFT JOIN agent_profile ap ON ap.user_id = u.id
      LEFT JOIN review r ON r.property_id = p.id
      WHERE w.user_id = ? AND w.deleted_at IS NULL AND p.deleted_at IS NULL
@@ -74,9 +79,10 @@ export async function getUserWishlist(userId: number): Promise<PropertyCardData[
 
 export async function getUserReviews(userId: number) {
   return query<RowDataPacket[]>(
+    // FIX: r.reviewer_id bukan r.user_id
     `SELECT r.*, p.title AS property_title
      FROM review r JOIN property p ON r.property_id = p.id
-     WHERE r.user_id = ? ORDER BY r.created_at DESC`,
+     WHERE r.reviewer_id = ? ORDER BY r.created_at DESC`,
     [userId],
   );
 }

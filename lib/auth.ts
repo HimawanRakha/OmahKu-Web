@@ -10,9 +10,8 @@ interface AuthUserRow extends RowDataPacket {
   full_name: string;
   email: string;
   username: string;
-  password_hash: string;
+  password: string; // FIX: kolom asli 'password', bukan 'password_hash'
   role: UserRole;
-  profile_photo_url: string | null;
 }
 
 declare module "next-auth" {
@@ -25,7 +24,6 @@ declare module "next-auth" {
       image: string | null;
     };
   }
-
   interface User {
     role: UserRole;
   }
@@ -44,20 +42,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const identifier = credentials?.identifier as string | undefined;
         const password = credentials?.password as string | undefined;
-
         if (!identifier || !password) return null;
 
+        // FIX: SELECT password (bukan password_hash), hapus profile_photo_url
         const user = await queryOne<AuthUserRow>(
-          `SELECT id, full_name, email, username, password_hash, role, profile_photo_url
-           FROM user
+          `SELECT id, full_name, email, username, password, role
+           FROM \`user\`
            WHERE (email = ? OR username = ?) AND deleted_at IS NULL
            LIMIT 1`,
           [identifier, identifier],
         );
-
         if (!user) return null;
 
-        const valid = await bcrypt.compare(password, user.password_hash);
+        const valid = await bcrypt.compare(password, user.password);
         if (!valid) return null;
 
         return {
@@ -65,7 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.full_name,
           email: user.email,
           role: user.role,
-          image: user.profile_photo_url,
+          image: null, // schema tidak punya kolom foto
         };
       },
     }),
