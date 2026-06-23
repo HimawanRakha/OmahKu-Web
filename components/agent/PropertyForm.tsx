@@ -59,9 +59,11 @@ export function PropertyForm({
     facing_direction: (initialData?.facing_direction as string) ?? "utara",
     address_detail: (initialData?.address_detail as string) ?? "",
     location_id: (initialData?.location_id as number) ?? 0,
-    selectedFacilities: [] as number[],
-    image_urls: [""],
-    primary_image_index: 0,
+    selectedFacilities: (initialData?.selectedFacilities as number[]) ?? [],
+    image_urls: ((initialData?.image_urls as string[])?.length
+      ? (initialData?.image_urls as string[])
+      : [""]),
+    primary_image_index: (initialData?.primary_image_index as number) ?? 0,
   });
 
   const [priceConfirm, setPriceConfirm] = useState(false);
