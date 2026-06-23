@@ -56,7 +56,8 @@ export function PropertyForm({
     building_area: (initialData?.building_area as number) ?? 0,
     year_built: (initialData?.year_built as number) ?? new Date().getFullYear(),
     certificate_type: (initialData?.certificate_type as CertificateType) ?? "SHM",
-    facing_direction: (initialData?.facing_direction as string) ?? "Utara",
+    facing_direction: (initialData?.facing_direction as string) ?? "utara",
+    address_detail: (initialData?.address_detail as string) ?? "",
     location_id: (initialData?.location_id as number) ?? 0,
     selectedFacilities: [] as number[],
     image_urls: [""],
@@ -80,23 +81,39 @@ export function PropertyForm({
       toast("error", "Periode sewa wajib diisi untuk tipe sewa.");
       return;
     }
+    if (!form.location_id) {
+      toast("error", "Pilih lokasi terlebih dahulu.");
+      setStep(3);
+      return;
+    }
+    if (!form.address_detail.trim()) {
+      toast("error", "Alamat lengkap wajib diisi.");
+      setStep(3);
+      return;
+    }
 
     setLoading(true);
-    const res = await fetch(
-      isEdit ? `/api/agent/listings/${propertyId}` : "/api/agent/listings",
-      {
-        method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      },
-    );
-    setLoading(false);
+    try {
+      const res = await fetch(
+        isEdit ? `/api/agent/listings/${propertyId}` : "/api/agent/listings",
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        },
+      );
 
-    if (res.ok) {
-      toast("success", isEdit ? "Properti diperbarui." : "Properti ditambahkan.");
-      router.push("/agent/dashboard/listings");
-    } else {
-      toast("error", "Gagal menyimpan properti.");
+      if (res.ok) {
+        toast("success", isEdit ? "Properti diperbarui." : "Properti ditambahkan.");
+        router.push("/agent/dashboard/listings");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast("error", data.error ?? "Gagal menyimpan properti.");
+      }
+    } catch {
+      toast("error", "Terjadi kesalahan jaringan. Coba lagi.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -206,12 +223,27 @@ export function PropertyForm({
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <input
-            placeholder="Arah hadap (Utara, Selatan, ...)"
-            value={form.facing_direction}
-            onChange={(e) => update("facing_direction", e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm"
-          />
+          <div>
+            <label className="text-sm text-gray-600">Arah Hadap</label>
+            <select
+              value={form.facing_direction}
+              onChange={(e) => update("facing_direction", e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm bg-white"
+            >
+              {[
+                { v: "utara", l: "Utara" },
+                { v: "timur", l: "Timur" },
+                { v: "selatan", l: "Selatan" },
+                { v: "barat", l: "Barat" },
+                { v: "timur_laut", l: "Timur Laut" },
+                { v: "tenggara", l: "Tenggara" },
+                { v: "barat_daya", l: "Barat Daya" },
+                { v: "barat_laut", l: "Barat Laut" },
+              ].map((o) => (
+                <option key={o.v} value={o.v}>{o.l}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <p className="text-sm font-medium text-gray-700 mb-2">Fasilitas</p>
             <div className="grid grid-cols-2 gap-2">
@@ -250,6 +282,15 @@ export function PropertyForm({
               </option>
             ))}
           </select>
+          <div>
+            <label className="text-sm text-gray-600">Alamat Lengkap</label>
+            <input
+              placeholder="Jl. Contoh No. 123, RT/RW, patokan"
+              value={form.address_detail}
+              onChange={(e) => update("address_detail", e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm"
+            />
+          </div>
           <p className="text-xs text-gray-400">
             {provinces.length} provinsi tersedia di database
           </p>

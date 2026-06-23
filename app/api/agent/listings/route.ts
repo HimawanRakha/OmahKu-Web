@@ -26,6 +26,21 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const agentId = Number(session.user.id);
+
+  // Validasi field wajib sebelum menyentuh DB (kolom NOT NULL di schema).
+  if (!body.title || !body.listing_type || !body.location_id) {
+    return NextResponse.json(
+      { error: "Judul, tipe penawaran, dan lokasi wajib diisi." },
+      { status: 400 },
+    );
+  }
+  if (!body.address_detail) {
+    return NextResponse.json({ error: "Alamat lengkap wajib diisi." }, { status: 400 });
+  }
+  if (body.listing_type === "rent" && !body.rent_period) {
+    return NextResponse.json({ error: "Periode sewa wajib untuk properti sewa." }, { status: 400 });
+  }
+
   const pool = getPool();
   const conn = await pool.getConnection();
 
@@ -34,17 +49,19 @@ export async function POST(request: Request) {
 
     const [result] = await conn.execute<ResultSetHeader>(
       `INSERT INTO property (
-        title, description, listing_type, price, rent_period,
+        title, description, address_detail, listing_type, price, rent_period,
         category_id, location_id, status, bedrooms, bathrooms, floors,
         land_area, building_area, year_built, certificate_type, facing_direction,
         agent_id, owner_id
-      ) VALUES (?, ?, ?, ?, ?, 1, ?, 'available', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'available', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         body.title,
-        body.description,
+        body.description ?? null,
+        body.address_detail,
         body.listing_type,
         body.price,
         body.listing_type === "rent" ? body.rent_period : null,
+        body.category_id ?? 1,
         body.location_id,
         body.bedrooms,
         body.bathrooms,
@@ -78,9 +95,10 @@ export async function POST(request: Request) {
 
     await conn.commit();
     return NextResponse.json({ success: true, id: propertyId });
-  } catch {
+  } catch (err) {
     await conn.rollback();
-    return NextResponse.json({ error: "Gagal menyimpan." }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Gagal menyimpan.";
+    return NextResponse.json({ error: message }, { status: 500 });
   } finally {
     conn.release();
   }
