@@ -38,24 +38,45 @@ export function BookingSidebar({ property }: { property: PropertyWithDetails }) 
         )
       : 0;
 
+  const isRent = property.listing_type === "rent";
+
   async function handleBooking() {
     if (!session) {
       router.push("/login");
       return;
+    }
+    // Aturan bisnis: properti sewa wajib punya periode (tanggal mulai & selesai).
+    if (isRent) {
+      if (!startDate || !endDate) {
+        toast("error", "Pilih tanggal mulai dan selesai sewa terlebih dahulu.");
+        return;
+      }
+      if (new Date(endDate) <= new Date(startDate)) {
+        toast("error", "Tanggal selesai harus setelah tanggal mulai.");
+        return;
+      }
     }
     setLoading(true);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ property_id: property.id }),
+        body: JSON.stringify({
+          property_id: property.id,
+          requested_start_date: isRent ? startDate : null,
+          requested_end_date: isRent ? endDate : null,
+        }),
       });
       if (res.ok) {
-        toast("success", "Booking berhasil diajukan!");
+        toast("success", "Booking berhasil diajukan! Menunggu konfirmasi agen.");
+        setStartDate("");
+        setEndDate("");
       } else {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         toast("error", data.error ?? "Gagal mengajukan booking.");
       }
+    } catch {
+      toast("error", "Terjadi kesalahan jaringan. Coba lagi.");
     } finally {
       setLoading(false);
     }

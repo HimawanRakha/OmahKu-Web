@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { notFound } from "next/navigation";
+import { SafeImage } from "@/components/SafeImage";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { BookingSidebar } from "@/components/properties/BookingSidebar";
 import { PropertyDetailTabs } from "@/components/properties/PropertyDetailTabs";
@@ -66,7 +66,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl overflow-hidden">
               {primaryImage && (
                 <div className="sm:col-span-2 relative aspect-[4/3] bg-gray-100">
-                  <Image
+                  <SafeImage
                     src={primaryImage.image_url as string}
                     alt={property.title}
                     fill
@@ -78,7 +78,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
                 {otherImages.slice(0, 4).map((img) => (
                   <div key={img.id as number} className="relative aspect-square bg-gray-100">
-                    <Image
+                    <SafeImage
                       src={img.image_url as string}
                       alt=""
                       fill

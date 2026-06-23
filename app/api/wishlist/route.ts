@@ -12,17 +12,11 @@ export async function POST(request: Request) {
   const userId = Number(session.user.id);
 
   const pool = getPool();
-  const [existing] = await pool.execute(
-    `SELECT id FROM wishlist WHERE user_id = ? AND property_id = ? AND deleted_at IS NULL`,
-    [userId, property_id],
-  );
-
-  if ((existing as unknown[]).length > 0) {
-    return NextResponse.json({ success: true });
-  }
-
+  // Upsert: revive a previously soft-deleted row instead of violating the
+  // UNIQUE (user_id, property_id) constraint when re-adding.
   await pool.execute(
-    `INSERT INTO wishlist (user_id, property_id) VALUES (?, ?)`,
+    `INSERT INTO wishlist (user_id, property_id) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE deleted_at = NULL, created_at = NOW()`,
     [userId, property_id],
   );
 

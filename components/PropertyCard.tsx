@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Heart, Star, Bed, Bath, Maximize, BadgeCheck } from "lucide-react";
+import { SafeImage } from "@/components/SafeImage";
 import type { PropertyCardData } from "@/types";
 import { formatPrice, cn } from "@/lib/utils";
 import { ListingTypeBadge, PropertyStatusBadge } from "@/components/StatusBadge";
@@ -50,7 +50,7 @@ export function PropertyCard({ property, onWishlistToggle, showRemove, onRemove 
     <Link href={`/properties/${property.id}`} className="group block bg-surface rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
       <div className="relative aspect-[4/3] bg-gray-100">
         {property.primary_image_url ? (
-          <Image src={property.primary_image_url} alt={property.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" sizes="(max-width: 768px) 100vw, 33vw" />
+          <SafeImage src={property.primary_image_url} alt={property.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" sizes="(max-width: 768px) 100vw, 33vw" />
         ) : (
           <div className="flex h-full items-center justify-center text-gray-300">
             <Maximize className="h-12 w-12" />

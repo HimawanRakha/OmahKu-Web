@@ -59,7 +59,7 @@ export function PropertyDetailTabs({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {facilities.length > 0 ? (
             facilities.map((f) => (
-              <div key={f.id as number} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+              <div key={f.facility_id as number} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                 <span className="text-2xl">{f.facility_icon as string}</span>
                 <div>
                   <p className="text-sm font-medium">{f.facility_name as string}</p>
